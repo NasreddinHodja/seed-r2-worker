@@ -1,15 +1,43 @@
-/**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `npm run deploy` to publish your worker
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
-
 export default {
-	async fetch(request, env, ctx) {
-		return new Response('Hello World!');
+	async fetch(request, env) {
+		const url = new URL(request.url);
+		const segments = url.pathname.split('/').slice(1);
+		const bucketName = segments.shift();
+		const key = segments.join('/');
+
+		if (request.method !== 'GET') {
+			return new Response('Method Not Allowed', {
+				status: 405,
+				headers: { Allow: 'GET' },
+			});
+		}
+
+		const bucket = env[bucketName];
+		if (!bucket) {
+			return new Response(`Bucket not found: ${bucketName}`, { status: 404 });
+		}
+
+		if (!key) {
+			return new Response('No object key provided', { status: 400 });
+		}
+
+		console.log(`bucket = ${bucket.name}`);
+
+		const object = await bucket.get(key);
+		if (!object) {
+			return new Response(`Object Not Found: ${key}`, { status: 404 });
+		}
+
+		const headers = new Headers();
+		object.writeHttpMetadata(headers);
+
+		if (!headers.has('Content-Type')) {
+			headers.set('Content-Type', 'application/octet-stream');
+		}
+
+		headers.set('etag', object.httpEtag);
+		headers.set('Cache-Control', 'public, max-age=86400');
+
+		return new Response(object.body, { headers });
 	},
 };
