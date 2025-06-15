@@ -21,8 +21,6 @@ export default {
 			return new Response('No object key provided', { status: 400 });
 		}
 
-		console.log(`bucket = ${bucket.name}`);
-
 		const object = await bucket.get(key);
 		if (!object) {
 			return new Response(`Object Not Found: ${key}`, { status: 404 });
